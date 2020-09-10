@@ -1,4 +1,5 @@
-{:aliases {:json {:extra-deps {cheshire/cheshire {:mvn/version "5.10.0"}}}
+{:deps {http-kit/http-kit {:mvn/version "2.5.0-RC1"}}
+ :aliases {:json {:extra-deps {cheshire/cheshire {:mvn/version "5.10.0"}}}
            :test {:extra-paths ["test"]
                   :extra-deps {cheshire./cheshire {:mvn/version "5.10.0"}
                                cognitect-labs/test-runner

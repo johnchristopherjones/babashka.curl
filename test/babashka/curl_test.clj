@@ -3,12 +3,18 @@
             [cheshire.core :as json]
             [clojure.java.io :as io]
             [clojure.string :as str]
-            [clojure.test :refer [deftest is testing]])
+            [clojure.test :refer [deftest is testing *report-counters*]])
   (:import (clojure.lang ExceptionInfo)))
 
 (defmethod clojure.test/report :begin-test-var [m]
   (println "===" (-> m :var meta :name))
   (println))
+
+(defmethod clojure.test/report :end-test-var [_m]
+  (let [{:keys [:fail :error]} @*report-counters*]
+    (when (or (pos? fail) (pos? error))
+      (println "=== Failing fast")
+      (System/exit 1))))
 
 (deftest get-test
   (is (str/includes? (:body (curl/get "https://httpstat.us/200"))
@@ -88,6 +94,7 @@
   (let [response (curl/get "https://httpstat.us/200")]
     (is (map? response))
     (is (= 200 (:status response)))
+    ;; fails with httpkit:
     (is (= "200 OK" (:body response)))
     (is (string? (get-in response [:headers "server"]))))
 
@@ -194,7 +201,7 @@
       (is (= (repeat 10 "data: Stream Hello!") (take 10 (line-seq (io/reader body)))))
       (.destroy proc))))
 
-(deftest command-test
+#_(deftest command-test
   (let [resp (curl/head "https://postman-echo.com/head" {:debug true})
         command (:command resp)
         opts (:options resp)]

@@ -1,10 +1,14 @@
 (ns babashka.curl
   (:refer-clojure :exclude [get read-line])
   (:require [clojure.java.io :as io]
-            [clojure.string :as str])
-  (:import [java.net URLEncoder]
-           [java.net URI]
-           [java.io File SequenceInputStream ByteArrayInputStream]))
+            [clojure.string :as str]
+            [org.httpkit.client :as client]
+            [org.httpkit.sni-client :as sni-client])
+  (:import [java.io File SequenceInputStream ByteArrayInputStream]
+           [java.net URLEncoder]
+           [java.net URI]))
+
+(alter-var-root #'client/*default-client* (constantly sni-client/default-client))
 
 (set! *warn-on-reflection* true)
 
@@ -211,7 +215,8 @@
     "babashka.curl: error"))
 
 (defn request [opts]
-  (let [header-file (File/createTempFile "babashka.curl" ".headers")
+  @(client/request opts)
+  #_(let [header-file (File/createTempFile "babashka.curl" ".headers")
         opts (assoc opts :header-file header-file)
         default-opts {:throw true}
         opts (merge default-opts opts)
