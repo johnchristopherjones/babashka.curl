@@ -57,6 +57,27 @@
   [^String unencoded]
   (URLEncoder/encode unencoded "UTF-8"))
 
+(defn- refer-file
+  "If the value is a file, translate into a curl file read."
+  [v]
+  (if (file? v) (str "@" (.getPath ^File v)) v))
+
+(defn create-multipart-param
+  [{:keys [name part-name content mime-type] :as part}]
+  (if (vector? part)
+    ["--form" (str/join "=" part)]
+    (let [k (or part-name name)
+          v (refer-file content)
+          t (when mime-type (str ";type=" mime-type))
+          headers-keys (remove #{:name :part-name :content :mime-type} part)]
+      ["--form" (str k "=" v t)]))
+  )
+
+(defn- create-multipart-params
+  "Take a multipart vector of maps and create a seq of curl form parameters."
+  [multipart]
+  (apply concat (map create-multipart-param multipart)))
+
 (defn- curl-command [opts]
   (let [body (:body opts)
         opts (if body
@@ -82,10 +103,11 @@
                              kvs (seq form-params)]
                         (if kvs
                           (let [[k v] (first kvs)
-                                v (if (file? v) (str "@" (.getPath ^File v)) v)
+                                v (refer-file v)
                                 param ["--data" (str (url-encode k) "=" (url-encode v))]]
                             (recur (reduce conj! params* param) (next kvs)))
                           (persistent! params*))))
+        multipart-params (create-multipart-params (:multipart opts))
         ;; TODO:
         ;; multipart-params (when-let [multipart (:multipart opts)]
         ;;                    (loop [params* (transient [])
@@ -138,7 +160,7 @@
         stream? (identical? :stream (:as opts))]
     [(conj (reduce into ["curl" "--silent" "--show-error" "--location" "--dump-header" header-file]
                    [method headers accept-header data-raw in-file in-stream basic-auth
-                    form-params #_multipart-params
+                    form-params multipart-params
                     ;; tested with SSE server, e.g. https://github.com/enkot/SSE-Fake-Server
                     (when stream? ["-N"])
                     (:raw-args opts)])

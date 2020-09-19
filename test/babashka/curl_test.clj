@@ -64,8 +64,7 @@
           headers (:headers body)
           content-type (:content-type headers)]
       (is (= "application/x-www-form-urlencoded" content-type))))
-  ;; TODO:
-  #_(testing "multipart"
+  (testing "multipart"
     (testing "posting file"
       (let [tmp-file (java.io.File/createTempFile "foo" "bar")
             _ (spit tmp-file "Michiel Borkent")
@@ -81,6 +80,8 @@
         (is (str/starts-with? content-type "multipart/form-data"))
         (is (:files body))
         (is (str/includes? (-> body :form :filename) "foo"))
+        #_(is (str/includes? (-> body :form :filename) "filename"))
+        #_(is (str/includes? (-> body :form :filename) "file2"))
         (prn body)))))
 
 (deftest patch-test
@@ -244,3 +245,36 @@
     (let [response (curl/get "https://httpstat.us/404" {:throw false})]
       (is (= 404 (:status response)))
       (is (zero? (:exit response))))))
+
+
+(deftest create-multipart-params-test
+  (testing "nil multipart"
+    (is (= nil (seq (#'curl/create-multipart-params nil)))))
+  (testing "string content"
+    (let [multipart [{:name "foo" :content "bar"}]]
+      (is (= ["--form" "foo=bar"]
+             (#'curl/create-multipart-params multipart)))))
+  (testing "with :mime-type"
+    (let [multipart [{:name "boo" :content "baz" :mime-type "text/plain"}]]
+      (is (= ["--form" "boo=baz;type=text/plain"]
+             (#'curl/create-multipart-params multipart)))))
+  (testing "with :part-name"
+    (let [multipart [{:name "boo" :content "baz" :mime-type "text/plain" :part-name "hotdog"}]]
+      (is (= ["--form" "hotdog=baz;type=text/plain"]
+             (#'curl/create-multipart-params multipart)))))
+  (testing "File content"
+    (let [multipart [{:name "myfile" :content (io/file "README.md")}]]
+      (is (= ["--form" "myfile=@README.md"]
+             (#'curl/create-multipart-params multipart)))))
+  #_(testing "vector part"
+    (let [multipart [["file4" (io/file "README.md")]]]
+      (is (= ["--form" "file4=@README.md"]
+             (#'curl/create-multipart-params multipart)))))
+  (testing "multiple fields"
+    (let [multipart [{:name "title" :content "awesome"}
+                     {:name "foo" :part-name "eggplant" :content "zack" :mime-type "text/plain"}
+                     {:name "myfile" :content (io/file "README.md")}]]
+      (is (= ["--form" "title=awesome"
+              "--form" "eggplant=zack;type=text/plain"
+              "--form" "myfile=@README.md"]
+             (#'curl/create-multipart-params multipart))))))
